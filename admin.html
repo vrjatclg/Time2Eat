@@ -68,9 +68,11 @@
         <form id="newItemForm" class="grid two">
           <input id="newItemName" placeholder="Item name" required />
           <input id="newItemPrice" type="number" min="0" placeholder="Price (₹)" required />
-          <input id="newItemImageUrl" placeholder="Image URL" />
+          <input id="newItemImageUrl" placeholder="Image URL (optional if uploading)" />
+          <input id="newItemImageFile" type="file" accept="image/*" />
           <button class="btn btn-primary" type="submit">Add Item</button>
         </form>
+        <div class="form-msg">Tip: You can paste an image URL or upload a file.</div>
         <div id="menuAdminGrid" class="grid"></div>
       </div>
     </section>
