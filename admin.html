@@ -1,113 +1,149 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Canteen Admin</title>
-  <link rel="stylesheet" href="./assets/styles.css" />
+  <meta charset="utf-8" />
+  <title>Canteen - Admin</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <link rel="stylesheet" href="./styles.css" />
 </head>
-<body>
-  <header class="site-header">
-    <h1>Canteen Admin</h1>
-    <nav class="top-nav">
-      <button id="navOrdersBtn" class="btn btn-text active">Orders</button>
-      <button id="navMenuBtn" class="btn btn-text">Menu</button>
-      <button id="navStudentsBtn" class="btn btn-text">Students</button>
-      <button id="signOutBtn" class="btn btn-text danger" style="display:none;">Sign Out</button>
+<body class="theme-admin">
+  <header class="app-header">
+    <div class="brand">
+      <img class="brand-logo" src="./assets/canteen.svg" alt="Canteen" />
+      <h1 class="brand-title">Canteen Admin</h1>
+    </div>
+    <nav class="actions">
+      <a href="./index.html" class="btn ghost">Student UI</a>
+      <button id="logoutBtn" class="btn ghost">Logout</button>
     </nav>
   </header>
 
-  <main class="container">
-    <!-- Login View -->
-    <section id="loginView" class="view active">
-      <form id="adminLoginForm" class="auth-form">
-        <h2>Admin Login</h2>
-        <label for="adminEmail">Email</label>
-        <input type="email" id="adminEmail" placeholder="admin@example.com" required />
-        <label for="adminPassword">Password</label>
-        <input type="password" id="adminPassword" placeholder="••••••••" required />
-        <button type="submit" class="btn btn-primary">Sign In</button>
-        <div id="loginMsg" class="form-msg"></div>
-      </form>
-    </section>
-
-    <!-- Orders Dashboard -->
-    <section id="ordersView" class="view" style="display:none;">
-      <div class="panel">
+  <main class="container" id="adminApp" hidden>
+    <section class="grid admin-grid">
+      <div class="card">
         <h2>Orders</h2>
         <div class="toolbar">
-          <input id="searchPidInput" placeholder="Search by PID" />
+          <input type="search" id="orderSearch" placeholder="Search by PID, code, status..." />
           <select id="statusFilter">
-            <option value="">All Status</option>
-            <option value="placed">Placed</option>
-            <option value="verified">Verified</option>
-            <option value="ready">Ready</option>
-            <option value="fulfilled">Fulfilled</option>
-            <option value="cancelled">Cancelled</option>
+            <option value="">All</option>
+            <option value="PENDING_PAYMENT">Pending Payment</option>
+            <option value="PAID_UNVERIFIED">Paid (Unverified)</option>
+            <option value="VERIFIED">Verified</option>
+            <option value="FULFILLED">Fulfilled</option>
+            <option value="CANCELLED">Cancelled</option>
           </select>
-          <button id="refreshOrdersBtn" class="btn btn-secondary">Refresh</button>
+          <button id="refreshOrders" class="btn">Refresh</button>
         </div>
-
-        <div class="verify-box">
-          <h3>Verify Payment Code</h3>
-          <form id="verifyForm">
-            <input id="verifyCodeInput" placeholder="Enter code (e.g., 9XZ4QK)" required />
-            <button class="btn btn-primary" type="submit">Verify</button>
-          </form>
-          <div id="verifyMsg" class="form-msg"></div>
-        </div>
-
-        <div id="ordersAdminList" class="list"></div>
+        <div id="ordersTable" class="table"></div>
       </div>
-    </section>
 
-    <!-- Menu Management -->
-    <section id="menuAdminView" class="view" style="display:none;">
-      <div class="panel">
+      <div class="card">
+        <h2>Verify Payment</h2>
+        <div class="verify">
+          <input id="verifyCodeInput" placeholder="Enter payment code..." />
+          <button id="verifyCodeBtn" class="btn primary">Verify</button>
+        </div>
+        <div id="verifyResult" class="muted small"></div>
+
+        <h3 class="mt">Student Status</h3>
+        <div class="verify">
+          <input id="studentPidInput" placeholder="Enter PID..." />
+          <button id="checkStudentBtn" class="btn">Check</button>
+        </div>
+        <div id="studentStatus" class="muted small"></div>
+        <div class="row gap">
+          <button id="blockStudentBtn" class="btn danger" disabled>Block</button>
+          <button id="unblockStudentBtn" class="btn" disabled>Unblock</button>
+        </div>
+      </div>
+
+      <div class="card">
         <h2>Menu</h2>
-        <form id="newItemForm" class="grid two">
-          <input id="newItemName" placeholder="Item name" required />
-          <input id="newItemPrice" type="number" min="0" placeholder="Price (₹)" required />
-          <input id="newItemImageUrl" placeholder="Image URL (optional if uploading)" />
-          <input id="newItemImageFile" type="file" accept="image/*" />
-          <button class="btn btn-primary" type="submit">Add Item</button>
-        </form>
-        <div class="form-msg">Tip: You can paste an image URL or upload a file.</div>
-        <div id="menuAdminGrid" class="grid"></div>
+        <div class="toolbar">
+          <button id="addMenuItemBtn" class="btn">Add Item</button>
+        </div>
+        <div id="menuTable" class="table"></div>
       </div>
-    </section>
 
-    <!-- Students Management -->
-    <section id="studentsAdminView" class="view" style="display:none;">
-      <div class="panel">
-        <h2>Students</h2>
-        <form id="studentLookupForm" class="lookup-form">
-          <input id="studentPidInput" placeholder="Enter PID" required />
-          <button class="btn btn-primary" type="submit">Lookup</button>
-        </form>
-        <div id="studentInfo" class="card" style="display:none;">
-          <div class="row">
-            <strong>PID:</strong> <span id="studentInfoPid"></span>
+      <div class="card">
+        <h2>Settings</h2>
+        <div class="settings">
+          <label class="field">
+            <span>Change Admin Password</span>
+            <input type="password" id="newPassword" placeholder="New password" />
+          </label>
+          <div class="row gap">
+            <button id="changePasswordBtn" class="btn">Update Password</button>
           </div>
-          <div class="row">
-            <strong>Blocked:</strong> <span id="studentInfoBlocked"></span>
+          <hr />
+          <div class="row spread">
+            <div>
+              <div class="small muted">Auto-block if cancellations in last 24h exceed</div>
+              <strong><span id="cancelThresholdDisplay"></span></strong>
+            </div>
+            <div class="row gap">
+              <button id="decThreshold" class="btn ghost">-</button>
+              <button id="incThreshold" class="btn ghost">+</button>
+            </div>
           </div>
-          <div class="row">
-            <strong>Cancellations (24h):</strong> <span id="studentInfoCancels"></span>
+          <hr />
+          <div class="row gap">
+            <button id="exportDataBtn" class="btn">Export Data</button>
+            <button id="importDataBtn" class="btn">Import Data</button>
+            <input type="file" id="importFile" accept="application/json" hidden />
+            <button id="resetDataBtn" class="btn danger">Factory Reset</button>
           </div>
-          <div class="actions">
-            <button id="blockStudentBtn" class="btn btn-danger">Block</button>
-            <button id="unblockStudentBtn" class="btn btn-secondary">Unblock</button>
-          </div>
+          <div class="small muted">Tip: If you forget your password and can't login, clear this site's local storage in your browser to reset.</div>
         </div>
       </div>
     </section>
   </main>
 
-  <footer class="site-footer">
-    <a href="./index.html">Back to Student</a>
-  </footer>
+  <main class="container" id="loginView">
+    <section class="card login-card">
+      <h2>Admin Login</h2>
+      <p class="muted small">Default password on first run: admin123</p>
+      <label class="field">
+        <span>Password</span>
+        <input type="password" id="adminPasswordInput" />
+      </label>
+      <div class="row gap">
+        <button id="loginBtn" class="btn primary">Login</button>
+      </div>
+      <div id="loginError" class="error small" hidden>Invalid password</div>
+    </section>
+  </main>
 
+  <!-- Add/Edit Menu Modal -->
+  <dialog id="menuModal" class="modal">
+    <form method="dialog" class="modal-card" id="menuForm">
+      <h3 id="menuModalTitle">Add Menu Item</h3>
+      <input type="hidden" id="menuItemId" />
+      <label class="field">
+        <span>Name</span>
+        <input type="text" id="menuName" required />
+      </label>
+      <label class="field">
+        <span>Price (₹)</span>
+        <input type="number" id="menuPrice" required min="0" step="1" />
+      </label>
+      <label class="field">
+        <span>Image URL</span>
+        <input type="url" id="menuImage" placeholder="https://..." />
+      </label>
+      <label class="toggle">
+        <input type="checkbox" id="menuAvailable" checked />
+        <span>Available</span>
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" id="menuCancelBtn">Cancel</button>
+        <button type="submit" class="btn primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="./js/utils.js"></script>
+  <script type="module" src="./js/storage.js"></script>
   <script type="module" src="./js/admin.js"></script>
 </body>
 </html>
