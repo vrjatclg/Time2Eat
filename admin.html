@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Canteen Admin</title>
+  <link rel="stylesheet" href="./assets/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <h1>Canteen Admin</h1>
+    <nav class="top-nav">
+      <button id="navOrdersBtn" class="btn btn-text active">Orders</button>
+      <button id="navMenuBtn" class="btn btn-text">Menu</button>
+      <button id="navStudentsBtn" class="btn btn-text">Students</button>
+      <button id="signOutBtn" class="btn btn-text danger" style="display:none;">Sign Out</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <!-- Login View -->
+    <section id="loginView" class="view active">
+      <form id="adminLoginForm" class="auth-form">
+        <h2>Admin Login</h2>
+        <label for="adminEmail">Email</label>
+        <input type="email" id="adminEmail" placeholder="admin@example.com" required />
+        <label for="adminPassword">Password</label>
+        <input type="password" id="adminPassword" placeholder="••••••••" required />
+        <button type="submit" class="btn btn-primary">Sign In</button>
+        <div id="loginMsg" class="form-msg"></div>
+      </form>
+    </section>
+
+    <!-- Orders Dashboard -->
+    <section id="ordersView" class="view" style="display:none;">
+      <div class="panel">
+        <h2>Orders</h2>
+        <div class="toolbar">
+          <input id="searchPidInput" placeholder="Search by PID" />
+          <select id="statusFilter">
+            <option value="">All Status</option>
+            <option value="placed">Placed</option>
+            <option value="verified">Verified</option>
+            <option value="ready">Ready</option>
+            <option value="fulfilled">Fulfilled</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <button id="refreshOrdersBtn" class="btn btn-secondary">Refresh</button>
+        </div>
+
+        <div class="verify-box">
+          <h3>Verify Payment Code</h3>
+          <form id="verifyForm">
+            <input id="verifyCodeInput" placeholder="Enter code (e.g., 9XZ4QK)" required />
+            <button class="btn btn-primary" type="submit">Verify</button>
+          </form>
+          <div id="verifyMsg" class="form-msg"></div>
+        </div>
+
+        <div id="ordersAdminList" class="list"></div>
+      </div>
+    </section>
+
+    <!-- Menu Management -->
+    <section id="menuAdminView" class="view" style="display:none;">
+      <div class="panel">
+        <h2>Menu</h2>
+        <form id="newItemForm" class="grid two">
+          <input id="newItemName" placeholder="Item name" required />
+          <input id="newItemPrice" type="number" min="0" placeholder="Price (₹)" required />
+          <input id="newItemImageUrl" placeholder="Image URL" />
+          <button class="btn btn-primary" type="submit">Add Item</button>
+        </form>
+        <div id="menuAdminGrid" class="grid"></div>
+      </div>
+    </section>
+
+    <!-- Students Management -->
+    <section id="studentsAdminView" class="view" style="display:none;">
+      <div class="panel">
+        <h2>Students</h2>
+        <form id="studentLookupForm" class="lookup-form">
+          <input id="studentPidInput" placeholder="Enter PID" required />
+          <button class="btn btn-primary" type="submit">Lookup</button>
+        </form>
+        <div id="studentInfo" class="card" style="display:none;">
+          <div class="row">
+            <strong>PID:</strong> <span id="studentInfoPid"></span>
+          </div>
+          <div class="row">
+            <strong>Blocked:</strong> <span id="studentInfoBlocked"></span>
+          </div>
+          <div class="row">
+            <strong>Cancellations (24h):</strong> <span id="studentInfoCancels"></span>
+          </div>
+          <div class="actions">
+            <button id="blockStudentBtn" class="btn btn-danger">Block</button>
+            <button id="unblockStudentBtn" class="btn btn-secondary">Unblock</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a href="./index.html">Back to Student</a>
+  </footer>
+
+  <script type="module" src="./js/admin.js"></script>
+</body>
+</html>
