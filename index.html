@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Canteen - Student Ordering</title>
+  <link rel="stylesheet" href="./assets/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <h1>Canteen</h1>
+    <nav class="top-nav">
+      <button id="navMenuBtn" class="btn btn-text active">Menu</button>
+      <button id="navMyOrdersBtn" class="btn btn-text">My Orders</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <!-- Menu / Ordering View -->
+    <section id="menuView" class="view active">
+      <div class="info-banner">
+        No login required. Enter your PID at checkout. Show the payment code to the canteen.
+      </div>
+      <div id="menuGrid" class="grid"></div>
+
+      <div class="cart">
+        <h2>Cart</h2>
+        <div id="cartItems"></div>
+        <div class="cart-summary">
+          <div>Total: ₹<span id="cartTotal">0</span></div>
+          <button id="clearCartBtn" class="btn btn-secondary">Clear</button>
+        </div>
+
+        <form id="checkoutForm" class="checkout-form">
+          <label for="pidInput">Enter PID</label>
+          <input type="text" id="pidInput" placeholder="e.g., 22BCS123" required />
+          <button id="placeOrderBtn" class="btn btn-primary" type="submit">Place Order & Generate Payment Code</button>
+          <div id="placeOrderMsg" class="form-msg"></div>
+        </form>
+      </div>
+    </section>
+
+    <!-- My Orders View -->
+    <section id="myOrdersView" class="view">
+      <form id="lookupForm" class="lookup-form">
+        <label for="lookupPidInput">Enter PID to view/cancel orders</label>
+        <input type="text" id="lookupPidInput" placeholder="Your PID" required />
+        <button class="btn btn-primary" type="submit">Find Orders</button>
+      </form>
+      <div id="blockedNotice" class="warning" style="display:none;"></div>
+      <div id="ordersList" class="list"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a href="./admin.html">Admin</a>
+  </footer>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
