@@ -1,61 +1,125 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Canteen - Student Ordering</title>
-  <link rel="stylesheet" href="./assets/styles.css" />
+  <meta charset="utf-8" />
+  <title>Canteen - Student</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <link rel="stylesheet" href="./styles.css" />
 </head>
-<body>
-  <header class="site-header">
-    <h1>Canteen</h1>
-    <nav class="top-nav">
-      <button id="navMenuBtn" class="btn btn-text active">Menu</button>
-      <button id="navMyOrdersBtn" class="btn btn-text">My Orders</button>
+<body class="theme-student">
+  <header class="app-header">
+    <div class="brand">
+      <img class="brand-logo" src="./assets/canteen.svg" alt="Canteen" />
+      <h1 class="brand-title">Canteen</h1>
+    </div>
+    <nav class="actions">
+      <button id="viewOrdersBtn" class="btn ghost">My Orders</button>
+      <a href="./admin.html" class="btn ghost desktop-only">Admin</a>
+      <button id="cartBtn" class="btn pill">
+        Cart <span id="cartCount" class="badge">0</span>
+      </button>
     </nav>
   </header>
 
   <main class="container">
-    <!-- Menu / Ordering View -->
-    <section id="menuView" class="view active">
-      <div class="info-banner">
-        No login required. Enter your PID at checkout. Show the payment code to the canteen.
+    <section class="notice" id="studentNotice" hidden></section>
+
+    <section class="menu-header">
+      <div class="search">
+        <input type="search" id="searchInput" placeholder="Search menu items..." />
       </div>
-      <div id="menuGrid" class="grid"></div>
-
-      <div class="cart">
-        <h2>Cart</h2>
-        <div id="cartItems"></div>
-        <div class="cart-summary">
-          <div>Total: ₹<span id="cartTotal">0</span></div>
-          <button id="clearCartBtn" class="btn btn-secondary">Clear</button>
-        </div>
-
-        <form id="checkoutForm" class="checkout-form">
-          <label for="pidInput">Enter PID</label>
-          <input type="text" id="pidInput" placeholder="e.g., 22BCS123" required />
-          <button id="placeOrderBtn" class="btn btn-primary" type="submit">Place Order & Generate Payment Code</button>
-          <div id="placeOrderMsg" class="form-msg"></div>
-        </form>
+      <div class="filters">
+        <label class="toggle">
+          <input type="checkbox" id="showUnavailable" />
+          <span>Show unavailable</span>
+        </label>
       </div>
     </section>
 
-    <!-- My Orders View -->
-    <section id="myOrdersView" class="view">
-      <form id="lookupForm" class="lookup-form">
-        <label for="lookupPidInput">Enter PID to view/cancel orders</label>
-        <input type="text" id="lookupPidInput" placeholder="Your PID" required />
-        <button class="btn btn-primary" type="submit">Find Orders</button>
-      </form>
-      <div id="blockedNotice" class="warning" style="display:none;"></div>
-      <div id="ordersList" class="list"></div>
-    </section>
+    <section id="menuGrid" class="grid"></section>
   </main>
 
-  <footer class="site-footer">
-    <a href="./admin.html">Admin</a>
+  <!-- Cart Drawer -->
+  <aside id="cartDrawer" class="drawer">
+    <div class="drawer-header">
+      <h2>Your Cart</h2>
+      <button class="icon-btn" id="closeCartBtn" aria-label="Close cart">✕</button>
+    </div>
+    <div id="cartItems" class="drawer-body"></div>
+    <div class="drawer-footer">
+      <div class="totals">
+        <div class="row">
+          <span>Subtotal</span>
+          <strong>₹ <span id="subtotal">0</span></strong>
+        </div>
+      </div>
+      <button id="checkoutBtn" class="btn primary full">Proceed to Checkout</button>
+    </div>
+  </aside>
+  <div id="scrim" class="scrim"></div>
+
+  <!-- PID Modal -->
+  <dialog id="pidDialog" class="modal">
+    <form method="dialog" class="modal-card" id="pidForm">
+      <h3>Enter your PID to place order</h3>
+      <p class="muted">No login required. This helps us keep your orders together.</p>
+      <label class="field">
+        <span>PID</span>
+        <input type="text" id="pidInput" placeholder="e.g., 21CS123" required minlength="3" />
+      </label>
+      <div id="pidWarnings" class="muted small"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" id="cancelPid">Cancel</button>
+        <button type="submit" class="btn primary">Continue</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Payment Modal -->
+  <dialog id="paymentDialog" class="modal">
+    <div class="modal-card">
+      <h3>Complete Payment</h3>
+      <p>Kindly complete your payment using your preferred app. Once done, tap the button below to generate your payment code.</p>
+      <div class="payment-summary">
+        <div>Order Total</div>
+        <div class="amount">₹ <span id="paymentTotal">0</span></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="cancelPaymentBtn">Cancel</button>
+        <button class="btn primary" id="generatePaymentCodeBtn">I have paid — Generate Code</button>
+      </div>
+      <div id="paymentCodeBlock" class="code-block" hidden>
+        <div class="small muted">Payment Code</div>
+        <div class="code" id="paymentCodeText"></div>
+        <div class="small muted">Show this code to the canteen admin for verification</div>
+        <button class="btn" id="copyPayCodeBtn">Copy Code</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Orders Modal -->
+  <dialog id="ordersDialog" class="modal">
+    <form method="dialog" class="modal-card" id="ordersForm">
+      <h3>Your Orders</h3>
+      <label class="field">
+        <span>PID</span>
+        <input type="text" id="ordersPidInput" placeholder="e.g., 21CS123" required />
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" id="ordersCancelBtn">Close</button>
+        <button type="submit" class="btn">View</button>
+      </div>
+
+      <div id="ordersList" class="orders-list"></div>
+    </form>
+  </dialog>
+
+  <footer class="app-footer">
+    <small>Fast, queue-free ordering.</small>
   </footer>
 
-  <script type="module" src="./js/app.js"></script>
+  <script type="module" src="./js/utils.js"></script>
+  <script type="module" src="./js/storage.js"></script>
+  <script type="module" src="./js/student.js"></script>
 </body>
 </html>
