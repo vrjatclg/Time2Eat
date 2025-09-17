@@ -1,15 +1,13 @@
-// Firebase initialization and exports.
+// Firebase initialization and exports (ES modules via CDN)
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
 import {
-  getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
+  getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut,
+  updatePassword, EmailAuthProvider, reauthenticateWithCredential
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import {
   getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc,
   query, where, orderBy, limit, onSnapshot, serverTimestamp, runTransaction
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
-import {
-  getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject
-} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDUYtoPn2MM6rAkcjk1il5baoRG6vegibA",
@@ -24,13 +22,11 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const storage = getStorage(app);
 
 // Re-exports
 export {
-  signInWithEmailAndPassword, onAuthStateChanged, signOut,
+  signInWithEmailAndPassword, onAuthStateChanged, signOut, updatePassword,
+  EmailAuthProvider, reauthenticateWithCredential,
   collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc,
-  query, where, orderBy, limit, onSnapshot, serverTimestamp, runTransaction,
-  // storage
-  storageRef, uploadBytes, getDownloadURL, deleteObject
+  query, where, orderBy, limit, onSnapshot, serverTimestamp, runTransaction
 };
