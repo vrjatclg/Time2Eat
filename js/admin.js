@@ -1,339 +1,342 @@
+import { $, $$, on, fmtINR, openDialog, closeDialog, formatItemsSummary } from './utils.js';
 import {
-  auth, signInWithEmailAndPassword, onAuthStateChanged, signOut,
-  db, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc,
-  query, where, orderBy, limit, onSnapshot, serverTimestamp,
-  // storage
-  storage, storageRef, uploadBytes, getDownloadURL
+  auth, signInWithEmailAndPassword, onAuthStateChanged, signOut, updatePassword
+} from './firebase.js';
+import {
+  fetchMenu, addMenuItem, updateMenuItem, deleteMenuItem,
+  verifyPaymentByCode, getStudent, setStudentBlocked
+} from './storage.js';
+import {
+  db, collection, doc, getDoc, getDocs, query, where, orderBy, limit, updateDoc
 } from './firebase.js';
 
-// Views and nav
-const loginView = document.getElementById('loginView');
-const ordersView = document.getElementById('ordersView');
-const menuAdminView = document.getElementById('menuAdminView');
-const studentsAdminView = document.getElementById('studentsAdminView');
+// Admin email used for Firebase Authentication
+const ADMIN_EMAIL = 'admin@example.com'; // <-- set to your real admin email
 
-const navOrdersBtn = document.getElementById('navOrdersBtn');
-const navMenuBtn = document.getElementById('navMenuBtn');
-const navStudentsBtn = document.getElementById('navStudentsBtn');
-const signOutBtn = document.getElementById('signOutBtn');
+// Elements
+const adminApp = $('#adminApp');
+const loginView = $('#loginView');
 
-// Login
-const adminLoginForm = document.getElementById('adminLoginForm');
-const adminEmail = document.getElementById('adminEmail');
-const adminPassword = document.getElementById('adminPassword');
-const loginMsg = document.getElementById('loginMsg');
+const adminPasswordInput = $('#adminPasswordInput');
+const loginBtn = $('#loginBtn');
+const logoutBtn = $('#logoutBtn');
+const loginError = $('#loginError');
 
-// Orders elements
-const searchPidInput = document.getElementById('searchPidInput');
-const statusFilter = document.getElementById('statusFilter');
-const refreshOrdersBtn = document.getElementById('refreshOrdersBtn');
-const ordersAdminList = document.getElementById('ordersAdminList');
+const orderSearch = $('#orderSearch');
+const statusFilter = $('#statusFilter');
+const refreshOrders = $('#refreshOrders');
+const ordersTable = $('#ordersTable');
 
-const verifyForm = document.getElementById('verifyForm');
-const verifyCodeInput = document.getElementById('verifyCodeInput');
-const verifyMsg = document.getElementById('verifyMsg');
+const verifyCodeInput = $('#verifyCodeInput');
+const verifyCodeBtn = $('#verifyCodeBtn');
+const verifyResult = $('#verifyResult');
 
-// Menu elements
-const newItemForm = document.getElementById('newItemForm');
-const newItemName = document.getElementById('newItemName');
-const newItemPrice = document.getElementById('newItemPrice');
-const newItemImageUrl = document.getElementById('newItemImageUrl');
-const newItemImageFile = document.getElementById('newItemImageFile');
-const menuAdminGrid = document.getElementById('menuAdminGrid');
+const studentPidInput = $('#studentPidInput');
+const checkStudentBtn = $('#checkStudentBtn');
+const studentStatus = $('#studentStatus');
+const blockStudentBtn = $('#blockStudentBtn');
+const unblockStudentBtn = $('#unblockStudentBtn');
 
-// Students elements
-const studentLookupForm = document.getElementById('studentLookupForm');
-const studentPidInput = document.getElementById('studentPidInput');
-const studentInfo = document.getElementById('studentInfo');
-const studentInfoPid = document.getElementById('studentInfoPid');
-const studentInfoBlocked = document.getElementById('studentInfoBlocked');
-const studentInfoCancels = document.getElementById('studentInfoCancels');
-const blockStudentBtn = document.getElementById('blockStudentBtn');
-const unblockStudentBtn = document.getElementById('unblockStudentBtn');
+const addMenuItemBtn = $('#addMenuItemBtn');
+const menuTable = $('#menuTable');
 
-function showSection(section) {
-  [loginView, ordersView, menuAdminView, studentsAdminView].forEach(s => s.style.display = 'none');
-  section.style.display = 'block';
-}
+const menuModal = $('#menuModal');
+const menuForm = $('#menuForm');
+const menuModalTitle = $('#menuModalTitle');
+const menuItemId = $('#menuItemId');
+const menuName = $('#menuName');
+const menuPrice = $('#menuPrice');
+const menuImage = $('#menuImage');
+const menuAvailable = $('#menuAvailable');
+const menuCancelBtn = $('#menuCancelBtn');
 
-navOrdersBtn.addEventListener('click', () => {
-  navOrdersBtn.classList.add('active');
-  navMenuBtn.classList.remove('active');
-  navStudentsBtn.classList.remove('active');
-  showSection(ordersView);
-  loadOrders();
-});
-navMenuBtn.addEventListener('click', () => {
-  navMenuBtn.classList.add('active');
-  navOrdersBtn.classList.remove('active');
-  navStudentsBtn.classList.remove('active');
-  showSection(menuAdminView);
-});
-navStudentsBtn.addEventListener('click', () => {
-  navStudentsBtn.classList.add('active');
-  navOrdersBtn.classList.remove('active');
-  navMenuBtn.classList.remove('active');
-  showSection(studentsAdminView);
-});
-
-// Auth
-adminLoginForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  loginMsg.textContent = '';
-  try {
-    await signInWithEmailAndPassword(auth, adminEmail.value.trim(), adminPassword.value.trim());
-  } catch (err) {
-    console.error(err);
-    loginMsg.textContent = 'Sign-in failed. Check credentials.';
+// Auth wiring
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    loginView.hidden = true;
+    adminApp.hidden = false;
+    loadOrders();
+    loadMenu();
+  } else {
+    adminApp.hidden = true;
+    loginView.hidden = false;
   }
 });
 
-signOutBtn.addEventListener('click', async () => {
+on(loginBtn, 'click', async () => {
+  loginError.hidden = true;
+  const pwd = adminPasswordInput.value.trim();
+  if (!pwd) return;
+  try {
+    await signInWithEmailAndPassword(auth, ADMIN_EMAIL, pwd);
+  } catch (e) {
+    loginError.hidden = false;
+  }
+});
+
+on(logoutBtn, 'click', async () => {
   await signOut(auth);
 });
 
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    signOutBtn.style.display = 'inline-block';
-    navOrdersBtn.classList.add('active');
-    navMenuBtn.classList.remove('active');
-    navStudentsBtn.classList.remove('active');
-    showSection(ordersView);
-    loadOrders();
-    startMenuWatcher();
-  } else {
-    signOutBtn.style.display = 'none';
-    showSection(loginView);
-  }
-});
-
-// Orders loading
+// Orders
 async function loadOrders() {
-  ordersAdminList.innerHTML = 'Loading...';
-  let qRef = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(50));
-  const pid = searchPidInput.value.trim().toUpperCase();
+  ordersTable.innerHTML = 'Loading...';
+  const col = collection(db, 'orders');
+  let qRef = query(col, orderBy('createdAt', 'desc'), limit(50));
+  const qtxt = (orderSearch.value || '').trim().toUpperCase();
   const status = statusFilter.value;
-  if (pid && status) {
-    qRef = query(collection(db, 'orders'),
-      where('pid', '==', pid),
-      where('status', '==', status),
-      orderBy('createdAt', 'desc'),
-      limit(50)
-    );
-  } else if (pid) {
-    qRef = query(collection(db, 'orders'),
-      where('pid', '==', pid),
-      orderBy('createdAt', 'desc'),
-      limit(50)
-    );
+
+  // Basic filtering combinations
+  if (qtxt && status) {
+    // try pid+status
+    qRef = query(col, where('pid', '==', qtxt), where('status', '==', toInternalStatus(status)), orderBy('createdAt', 'desc'), limit(50));
+  } else if (qtxt) {
+    // try by pid or code (fallback client filter for code)
+    qRef = query(col, where('pid', '==', qtxt), orderBy('createdAt', 'desc'), limit(50));
   } else if (status) {
-    qRef = query(collection(db, 'orders'),
-      where('status', '==', status),
-      orderBy('createdAt', 'desc'),
-      limit(50)
-    );
+    qRef = query(col, where('status', '==', toInternalStatus(status)), orderBy('createdAt', 'desc'), limit(50));
   }
 
   const snap = await getDocs(qRef);
-  if (snap.empty) {
-    ordersAdminList.innerHTML = '<div class="muted">No orders.</div>';
-    return;
+  let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  // If search query looks like a code, additionally client-filter
+  if (qtxt && !rows.length) {
+    const allSnap = await getDocs(query(col, orderBy('createdAt', 'desc'), limit(100)));
+    rows = allSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(o =>
+      o.paymentCode?.toUpperCase() === qtxt || o.pid?.toUpperCase() === qtxt
+    );
   }
-  ordersAdminList.innerHTML = '';
-  snap.forEach(docSnap => {
-    const o = { id: docSnap.id, ...docSnap.data() };
-    const card = document.createElement('div');
-    card.className = 'card order-card';
-    const statusClass = o.status === 'cancelled' ? 'cancelled'
-      : o.status === 'verified' ? 'paid'
-      : o.status;
 
-    const itemsHtml = (o.items || []).map(it => `${it.name} x ${it.quantity}`).join(', ');
-    card.innerHTML = `
-      <div class="row">
-        <div><strong>${o.pid}</strong> • ${o.id}</div>
-        <div class="order-status ${statusClass}">${o.status}${o.paymentVerified ? ' • paid' : ''}</div>
-      </div>
-      <div class="row"><span>${itemsHtml}</span><strong>₹${o.total?.toFixed?.(2) || o.total}</strong></div>
-      <div class="row"><span>Code: <strong>${o.paymentCode}</strong></span><span>${o.createdAt?.toDate ? o.createdAt.toDate().toLocaleString() : ''}</span></div>
-      <div class="actions">
-        <button class="btn btn-primary" data-markready="${o.id}" ${!(o.paymentVerified && o.status !== 'ready' && o.status !== 'fulfilled') ? 'disabled' : ''}>Mark Ready</button>
-        <button class="btn btn-secondary" data-fulfill="${o.id}" ${(o.status !== 'ready') ? 'disabled' : ''}>Mark Fulfilled</button>
-        <button class="btn btn-danger" data-delete="${o.id}">Delete</button>
-      </div>
+  // Render table
+  ordersTable.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>PID</th>
+          <th>Items</th>
+          <th>Total</th>
+          <th>Status</th>
+          <th>Code</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  `;
+  const tbody = ordersTable.querySelector('tbody');
+
+  for (const o of rows) {
+    const when = o.createdAt?.toDate ? o.createdAt.toDate().toLocaleString() : '';
+    const items = formatItemsSummary(o.items || []);
+    const badgeClass = toExternalBadge(o);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${when}</td>
+      <td>${o.pid}</td>
+      <td class="small muted">${items}</td>
+      <td>₹ ${fmtINR(o.total)}</td>
+      <td><span class="status ${badgeClass}">${statusLabel(o)}</span></td>
+      <td>${o.paymentCode || ''}</td>
+      <td>
+        <button class="btn small" data-ready="${o.id}" ${!(o.paymentVerified && o.status !== 'ready' && o.status !== 'fulfilled') ? 'disabled' : ''}>Mark Ready</button>
+        <button class="btn small" data-fulfill="${o.id}" ${(o.status !== 'ready') ? 'disabled' : ''}>Fulfill</button>
+        <button class="btn danger small" data-delete="${o.id}">Delete</button>
+      </td>
     `;
-    ordersAdminList.appendChild(card);
-  });
+    tbody.appendChild(tr);
+  }
 }
 
-refreshOrdersBtn.addEventListener('click', loadOrders);
-searchPidInput.addEventListener('change', loadOrders);
-statusFilter.addEventListener('change', loadOrders);
+function toInternalStatus(external) {
+  // Map UI filter to our internal status
+  switch (external) {
+    case 'PENDING_PAYMENT': return 'placed';
+    case 'VERIFIED': return 'verified';
+    case 'FULFILLED': return 'fulfilled';
+    case 'CANCELLED': return 'cancelled';
+    default: return '';
+  }
+}
+function toExternalBadge(o) {
+  if (o.status === 'cancelled') return 'CANCELLED';
+  if (o.status === 'fulfilled') return 'FULFILLED';
+  if (o.status === 'ready') return 'VERIFIED';
+  if (o.status === 'verified') return 'VERIFIED';
+  return o.paymentVerified ? 'VERIFIED' : 'PENDING_PAYMENT';
+}
+function statusLabel(o) {
+  if (o.status === 'ready') return 'READY';
+  if (o.status) return o.status.toUpperCase();
+  return toExternalBadge(o);
+}
 
-ordersAdminList.addEventListener('click', async (e) => {
-  const id = e.target?.dataset?.markready || e.target?.dataset?.fulfill || e.target?.dataset?.delete;
+on(refreshOrders, 'click', loadOrders);
+on(statusFilter, 'change', loadOrders);
+on(orderSearch, 'input', debounce(loadOrders, 300));
+
+on(ordersTable, 'click', async (e) => {
+  const btn = e.target;
+  const id = btn?.dataset?.ready || btn?.dataset?.fulfill || btn?.dataset?.delete;
   if (!id) return;
   const orderRef = doc(db, 'orders', id);
-  const orderSnap = await getDoc(orderRef);
-  if (!orderSnap.exists()) return;
-  const order = orderSnap.data();
-  const studentOrderRef = doc(db, 'students', order.pid, 'orders', id);
+  const snap = await getDoc(orderRef);
+  if (!snap.exists()) return;
+  const o = snap.data();
+  const stuRef = doc(db, 'students', o.pid, 'orders', id);
 
-  if (e.target?.dataset?.markready) {
+  if (btn.dataset.ready) {
     await updateDoc(orderRef, { status: 'ready' });
-    await updateDoc(studentOrderRef, { status: 'ready' });
-    loadOrders();
-  } else if (e.target?.dataset?.fulfill) {
+    await updateDoc(stuRef, { status: 'ready' });
+  } else if (btn.dataset.fulfill) {
     await updateDoc(orderRef, { status: 'fulfilled' });
-    await updateDoc(studentOrderRef, { status: 'fulfilled' });
-    loadOrders();
-  } else if (e.target?.dataset?.delete) {
+    await updateDoc(stuRef, { status: 'fulfilled' });
+  } else if (btn.dataset.delete) {
     if (!confirm('Delete this order?')) return;
-    await deleteDoc(orderRef);
-    await deleteDoc(studentOrderRef);
-    loadOrders();
+    await updateDoc(orderRef, { status: 'cancelled' }); // soft mark before delete (optional)
+    // Delete both
+    await Promise.all([
+      (await import('./firebase.js')).deleteDoc(orderRef),
+      (await import('./firebase.js')).deleteDoc(stuRef)
+    ]);
   }
+  loadOrders();
 });
 
 // Verify payment code
-verifyForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  verifyMsg.textContent = '';
-  const code = verifyCodeInput.value.trim().toUpperCase();
+on(verifyCodeBtn, 'click', async () => {
+  verifyResult.textContent = '';
+  const code = (verifyCodeInput.value || '').trim().toUpperCase();
   if (!code) return;
   try {
-    const qRef = query(collection(db, 'orders'), where('paymentCode', '==', code), limit(1));
-    const snap = await getDocs(qRef);
-
-    if (snap.empty) {
-      verifyMsg.textContent = 'Invalid code.';
-      return;
-    }
-
-    const oSnap = snap.docs[0];
-    const orderId = oSnap.id;
-    const order = oSnap.data();
-
-    if (order.paymentVerified) {
-      verifyMsg.textContent = 'Already verified.';
-      return;
-    }
-
-    const orderRef = doc(db, 'orders', orderId);
-    await updateDoc(orderRef, { paymentVerified: true, status: 'verified' });
-
-    const studentOrderRef = doc(db, 'students', order.pid, 'orders', orderId);
-    await updateDoc(studentOrderRef, { paymentVerified: true, status: 'verified' });
-
-    verifyMsg.textContent = `Payment verified for PID ${order.pid}.`;
+    const { order } = await verifyPaymentByCode(code);
+    verifyResult.textContent = `Payment verified for ${order.pid}`;
     loadOrders();
-  } catch (err) {
-    console.error(err);
-    verifyMsg.textContent = 'Verification failed. Try again.';
+  } catch (e) {
+    verifyResult.textContent = e.message || 'Verification failed.';
   }
 });
 
-// Menu management
-function startMenuWatcher() {
-  const qRef = query(collection(db, 'menuItems'), orderBy('name'));
-  onSnapshot(qRef, (snap) => {
-    menuAdminGrid.innerHTML = '';
-    snap.forEach(docSnap => {
-      const item = { id: docSnap.id, ...docSnap.data() };
-      const card = document.createElement('div');
-      card.className = 'card item-card';
-      card.innerHTML = `
-        <img src="${item.imageUrl || 'https://picsum.photos/seed/' + encodeURIComponent(item.name) + '/600/400'}" alt="${item.name}" />
-        <div class="row">
-          <strong contenteditable="true" data-name="${item.id}">${item.name}</strong>
-          <input class="price-input" data-price="${item.id}" type="number" min="0" value="${item.price}" />
-        </div>
-        <div class="row">
-          <span class="muted">${item.available ? 'Available' : 'Unavailable'}</span>
-          <div class="actions">
-            <input type="file" accept="image/*" data-imgfile="${item.id}" />
-            <button class="btn btn-secondary" data-upload="${item.id}">Upload Image</button>
-            <button class="btn btn-secondary" data-toggle="${item.id}">${item.available ? 'Mark Unavailable' : 'Mark Available'}</button>
-            <button class="btn btn-primary" data-save="${item.id}">Save</button>
-            <button class="btn btn-danger" data-del="${item.id}">Delete</button>
-          </div>
-        </div>
-      `;
-      menuAdminGrid.appendChild(card);
-    });
-  });
-}
-
-async function uploadMenuImage(file, itemId, itemName) {
-  const cleanName = (itemName || 'item').replace(/[^a-z0-9-_]+/gi, '-').toLowerCase();
-  const path = `menuImages/${itemId}-${Date.now()}-${cleanName}`;
-  const ref = storageRef(storage, path);
-  const snap = await uploadBytes(ref, file);
-  const url = await getDownloadURL(snap.ref);
-  return url;
-}
-
-menuAdminGrid.addEventListener('click', async (e) => {
-  const id = e.target?.dataset?.toggle || e.target?.dataset?.save || e.target?.dataset?.del || e.target?.dataset?.upload;
-  if (!id) return;
-
-  const card = e.target.closest('.item-card');
-  const nameEl = card.querySelector(`[data-name="${id}"]`);
-  const priceEl = card.querySelector(`[data-price="${id}"]`);
-
-  if (e.target?.dataset?.upload) {
-    const fileInput = card.querySelector(`[data-imgfile="${id}"]`);
-    const file = fileInput?.files?.[0];
-    if (!file) {
-      alert('Choose an image file first.');
-      return;
-    }
-    const refDoc = doc(db, 'menuItems', id);
-    const snap = await getDoc(refDoc);
-    const item = snap.exists() ? snap.data() : { name: nameEl.textContent.trim() || 'Item' };
-    const url = await uploadMenuImage(file, id, item.name);
-    await updateDoc(refDoc, { imageUrl: url, updatedAt: serverTimestamp() });
-    alert('Image uploaded.');
+// Student status
+on(checkStudentBtn, 'click', async () => {
+  studentStatus.textContent = '';
+  const pid = (studentPidInput.value || '').trim().toUpperCase();
+  if (!pid) return;
+  const stu = await getStudent(pid);
+  if (!stu) {
+    studentStatus.textContent = 'No record found. Student can place new order.';
+    blockStudentBtn.disabled = false;
+    unblockStudentBtn.disabled = true;
+    blockStudentBtn.onclick = async () => {
+      await setStudentBlocked(pid, true);
+      studentStatus.textContent = 'Blocked.';
+    };
     return;
   }
+  studentStatus.textContent = `Blocked: ${stu.blocked ? 'Yes' : 'No'}`;
+  blockStudentBtn.disabled = !!stu.blocked;
+  unblockStudentBtn.disabled = !stu.blocked;
+  blockStudentBtn.onclick = async () => {
+    await setStudentBlocked(pid, true);
+    studentStatus.textContent = 'Blocked: Yes';
+    blockStudentBtn.disabled = true; unblockStudentBtn.disabled = false;
+  };
+  unblockStudentBtn.onclick = async () => {
+    await setStudentBlocked(pid, false);
+    studentStatus.textContent = 'Blocked: No';
+    blockStudentBtn.disabled = false; unblockStudentBtn.disabled = true;
+  };
+});
 
-  if (e.target?.dataset?.toggle) {
-    const ref = doc(db, 'menuItems', id);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) return;
-    const { available = true } = snap.data();
-    await updateDoc(ref, { available: !available, updatedAt: serverTimestamp() });
-  } else if (e.target?.dataset?.save) {
-    const ref = doc(db, 'menuItems', id);
-    const newName = nameEl.textContent.trim();
-    const newPrice = Number(priceEl.value);
-    await updateDoc(ref, { name: newName, price: newPrice, updatedAt: serverTimestamp() });
-    alert('Saved.');
-  } else if (e.target?.dataset?.del) {
-    if (!confirm('Delete this menu item?')) return;
-    await deleteDoc(doc(db, 'menuItems', id));
+// Menu
+async function loadMenu() {
+  menuTable.innerHTML = 'Loading...';
+  const items = await fetchMenu();
+  menuTable.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th><th>Price</th><th>Avail</th><th>Image</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  `;
+  const tbody = menuTable.querySelector('tbody');
+  for (const it of items) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${it.name}</td>
+      <td>₹ ${fmtINR(it.price)}</td>
+      <td>${it.available ? 'Yes' : 'No'}</td>
+      <td class="small muted">${it.imageUrl ? `<a href="${it.imageUrl}" target="_blank">link</a>` : '-'}</td>
+      <td>
+        <button class="btn small" data-edit="${it.id}">Edit</button>
+        <button class="btn small" data-toggle="${it.id}">${it.available ? 'Disable' : 'Enable'}</button>
+        <button class="btn danger small" data-del="${it.id}">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+on(addMenuItemBtn, 'click', () => {
+  menuForm.reset();
+  menuItemId.value = '';
+  menuModalTitle.textContent = 'Add Menu Item';
+  menuAvailable.checked = true;
+  openDialog(menuModal);
+});
+on(menuCancelBtn, 'click', () => closeDialog(menuModal));
+
+on(menuForm, 'submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    name: menuName.value.trim(),
+    price: Number(menuPrice.value || 0),
+    imageUrl: menuImage.value.trim() || null,
+    available: menuAvailable.checked
+  };
+  if (!payload.name) return;
+  try {
+    if (menuItemId.value) {
+      await updateMenuItem(menuItemId.value, payload);
+    } else {
+      await addMenuItem(payload);
+    }
+    closeDialog(menuModal);
+    loadMenu();
+  } catch (e2) {
+    alert('Failed to save item.');
   }
 });
 
-newItemForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const name = newItemName.value.trim();
-  const price = Number(newItemPrice.value);
-  const imageUrlText = newItemImageUrl.value.trim();
-  const file = newItemImageFile.files?.[0] || null;
-  if (!name || !Number.isFinite(price)) return;
-
-  // Create empty item first to get ID if we need to upload file
-  const base = { name, price, imageUrl: imageUrlText || null, available: true, createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
-  let docRef = await addDoc(collection(db, 'menuItems'), base);
-
-  if (file) {
-    const url = await uploadMenuImage(file, docRef.id, name);
-    await updateDoc(docRef, { imageUrl: url, updatedAt: serverTimestamp() });
+on(menuTable, 'click', async (e) => {
+  const btn = e.target;
+  const editId = btn?.dataset?.edit;
+  const delId = btn?.dataset?.del;
+  const toggleId = btn?.dataset?.toggle;
+  if (editId) {
+    // Load doc
+    const snap = await getDoc(doc(db, 'menuItems', editId));
+    if (!snap.exists()) return;
+    const it = snap.data();
+    menuItemId.value = editId;
+    menuName.value = it.name || '';
+    menuPrice.value = Number(it.price || 0);
+    menuImage.value = it.imageUrl || '';
+    menuAvailable.checked = !!it.available;
+    menuModalTitle.textContent = 'Edit Menu Item';
+    openDialog(menuModal);
+  } else if (toggleId) {
+    const snap = await getDoc(doc(db, 'menuItems', toggleId));
+    if (!snap.exists()) return;
+    const cur = !!snap.data().available;
+    await updateMenuItem(toggleId, { available: !cur });
+    loadMenu();
+  } else if (delId) {
+    if (!confirm('Delete this item?')) return;
+    await deleteMenuItem(delId);
+    loadMenu();
   }
-
-  newItemName.value = '';
-  newItemPrice.value = '';
-  newItemImageUrl.value = '';
-  newItemImageFile.value = '';
 });
